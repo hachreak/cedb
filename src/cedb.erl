@@ -22,7 +22,8 @@ break(Module, Line) ->
   int:test_at_break(Module, Line, {?MODULE, show}).
 
 debug(Pid) ->
-  eval(go, Pid),
+  {ok, Meta} = int:attached(Pid),
+  eval(go, Meta),
   int:continue(Pid),
   false.
 
@@ -33,17 +34,17 @@ show(Bindings) ->
   error_logger:error_msg("~p~n", [lists:flatten(lists:join("~n", Print))]),
   true.
 
-eval(continue, _Pid) -> ok;
-eval(Cmd, Pid) ->
+eval(continue, _) -> ok;
+eval(Cmd, Meta) ->
   case lists:member(Cmd, [finish, next, step]) of
     true ->
-      apply(int, Cmd, [Pid]);
+      int:meta(Meta, Cmd);
     false -> ok
   end,
-  repl(Pid).
+  repl(Meta).
 
-repl(Pid) ->
-  eval(run(io:get_line("cedb> ")), Pid).
+repl(Meta) ->
+  eval(run(io:get_line("cedb> ")), Meta).
 
 run("\n") -> "";
 run(Expression) ->
