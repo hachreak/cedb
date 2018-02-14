@@ -36,7 +36,8 @@ show(Bindings) ->
 
 eval(continue, _) -> ok;
 eval(Cmd, Meta) ->
-  case lists:member(Cmd, [finish, next, step]) of
+  case lists:member(Cmd, [finish, next, step, skip, stop,
+                          messages, timeout]) of
     true ->
       int:meta(Meta, Cmd);
     false -> ok
