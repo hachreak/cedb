@@ -42,6 +42,9 @@ eval2(bindings, Meta) ->
   Ret = int:meta(Meta, bindings, nostack),
   io:format("bind: ~p~n", [Ret]),
   meta_response();
+eval2(backtrace, Meta) ->
+  backtrace(int:meta(Meta, backtrace, 100)),
+  meta_response();
 eval2(_, _) -> ok.
 
 repl(Meta) ->
@@ -101,3 +104,16 @@ run(Expression) ->
       io:format("[~s] ~p~n", [color:red("error"), Err]),
       "\n"
   end.
+
+backtrace(Backtrace) ->
+  io:format("~n  Backtrace:~n~n"),
+  lists:foreach(fun({Deep, {M,F,A}}) ->
+      Space = lists:flatten(lists:duplicate(Deep, " ")),
+      io:format("    ~s~s:~s ~p~n", [
+        Space,
+        color:true("CC2345", atom_to_list(M)),
+        color:true("CC0000", atom_to_list(F)),
+        A
+      ])
+    end, lists:reverse(Backtrace)),
+  io:format("~n").
