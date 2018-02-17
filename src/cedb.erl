@@ -88,11 +88,16 @@ range_to_show(Lines, LineNumber) ->
 
 run("\n") -> "";
 run(Expression) ->
-  % io:format("expr: (~p)~n", [Expression]),
-  % scan the code into tokens
-  {ok, Tokens, _} = erl_scan:string(Expression),
-  % parse the tokens into an abstract form
-  {ok, Parsed} = erl_parse:parse_exprs(Tokens),
-  % evaluate the expression, return the value
-  {value, Result, _} = erl_eval:exprs(Parsed, []),
-  Result.
+  try
+    % scan the code into tokens
+    {ok, Tokens, _} = erl_scan:string(Expression),
+    % parse the tokens into an abstract form
+    {ok, Parsed} = erl_parse:parse_exprs(Tokens),
+    % evaluate the expression, return the value
+    {value, Result, _} = erl_eval:exprs(Parsed, []),
+    Result
+  catch
+    error:{badmatch, {error, {_, erl_parse, Err}}} ->
+      io:format("[~s] ~p~n", [color:red("error"), Err]),
+      "\n"
+  end.
