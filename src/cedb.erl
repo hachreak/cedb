@@ -6,57 +6,60 @@
 -module(cedb).
 
 -export([
-  debug/1,
-  break/2
+  debug/2,
+  break/3
 ]).
 
 %%====================================================================
 %% API
 %%====================================================================
 
-break(Module, Line) ->
-  int:i(Module),
-  int:break(Module, Line),
-  int:auto_attach([break], {?MODULE, debug, []}).
-
-debug(Pid) ->
+debug(Pid, Srv) ->
   {ok, Meta} = int:attached(Pid),
-  meta_response(),
-  eval(go, Meta),
-  int:continue(Pid),
-  false.
+  gen_server:cast(Srv, {set, meta, Meta}),
+  gen_server:cast(Srv, {set, pid, Pid}),
+  messages(Srv),
+  eval(go, Srv).
 
-eval(continue, _) -> ok;
-eval(Cmd, Meta) ->
+break(Module, Line, Pid) ->
+  gen_server:call(Pid, {break, Module, Line, {cedb, debug, [Pid]}}).
+
+eval(continue, Srv) ->
+  gen_server:call(Srv, continue);
+eval(Cmd, Srv) ->
   case lists:member(Cmd, [finish, next, step, skip, stop,
-                          messages, timeout]) of
+                          messages, timeout, bindings, continue, backtrace]) of
     true ->
-      int:meta(Meta, Cmd),
-      meta_response();
+      print(Cmd, gen_server:call(Srv, Cmd)),
+      messages(Srv);
     false ->
-      eval2(Cmd, Meta)
+      ok
   end,
-  repl(Meta).
+  repl(Srv).
 
-eval2(bindings, Meta) ->
-  Ret = int:meta(Meta, bindings, nostack),
-  io:format("bind: ~p~n", [Ret]),
-  meta_response();
-eval2(backtrace, Meta) ->
-  backtrace(int:meta(Meta, backtrace, 100)),
-  meta_response();
-eval2(_, _) -> ok.
+repl(Srv) ->
+  eval(run(io:get_line("cedb> ")), Srv).
 
-repl(Meta) ->
-  eval(run(io:get_line("cedb> ")), Meta).
+print(bindings, Bindings) ->
+  io:format("Bindings ~p~n", [Bindings]);
+print(backtrace, Backtrace) ->
+  backtrace(Backtrace);
+print(Cmd, ToPrint) ->
+  io:format("To print: ~p ~p~n", [Cmd, ToPrint]).
 
-meta_response() ->
-  receive
-    {_Pid, {attached, Module, Line, _Trace}} ->
+messages(Srv) ->
+  Result = receive
+    {_, idle} ->
+      gen_server:call(Srv, continue);
+    {_, {break_at, Module, Line, _}} ->
       show_line(Module, Line);
-    {_Pid, {break_at, Module, Line, _Column}} ->
-      show_line(Module, Line);
-    Msg -> io:format("MSG: ~p~n", [Msg])
+    Msg ->
+      io:format("=> ~p~n~n", [Msg])
+    after 200 -> exit
+  end,
+  case Result of
+    exit -> ok;
+    _ -> messages(Srv)
   end.
 
 show_line(Module, LineNumber) ->
@@ -73,7 +76,8 @@ show_line(Module, LineNumber) ->
         false -> "606000"
       end,
       io:format("  ~p:\t~s~n", [Number, color:true(Color, String)])
-    end, lists:zip(Seq, LinesToShow)).
+    end, lists:zip(Seq, LinesToShow)),
+  io:format("~n").
 
 range_to_show(Lines, LineNumber) ->
   Length = length(Lines),
