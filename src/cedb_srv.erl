@@ -44,6 +44,10 @@ async_cmd({set, pid, Pid}, Ctx) ->
 async_cmd({set, meta, Meta}, Ctx) ->
   Ctx#{meta => Meta}.
 
+sync_cmd({get, module, Module}, #{pid := Pid}=Ctx) ->
+  Filename = int:file(Module),
+  Content = int:contents(Module, Pid),
+  {{Filename, Content}, Ctx};
 sync_cmd({get, pid}, #{pid := Pid}=Ctx) ->
   {Pid, Ctx};
 sync_cmd({break, Module, Line, MFA}, Ctx) ->

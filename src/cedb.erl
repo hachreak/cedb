@@ -52,7 +52,10 @@ messages(Srv) ->
     {_, idle} ->
       gen_server:call(Srv, continue);
     {_, {break_at, Module, Line, _}} ->
-      show_line(Module, Line);
+      {Filename, Content} = gen_server:call(Srv, {get, module, Module}),
+      % io:format("~s~n", [Content]);
+      % lists:foreach(fun(L) -> io:format("~p~n", [L]) end, Content);
+      show_line(Filename, Content, Line);
     Msg ->
       io:format("=> ~p~n~n", [Msg])
     after 200 -> exit
@@ -62,20 +65,19 @@ messages(Srv) ->
     _ -> messages(Srv)
   end.
 
-show_line(Module, LineNumber) ->
-  Filename = int:file(Module),
-  {ok, File} = file:read_file(Filename),
-  Lines = re:split(File, "\n"),
+show_line(Filename, Content, LineNumber) ->
+  Lines = re:split(Content, "\n"),
   {First, Last} = range_to_show(Lines, LineNumber),
   LinesToShow = lists:sublist(Lines, First, Last - First + 1),
   Seq = lists:seq(First, Last),
+  io:format("File ~s~n~n", [color:true("108040", Filename)]),
   lists:foreach(fun({Number, Line}) ->
       String = binary_to_list(Line),
       Color = case Number =:= LineNumber of
         true -> "C0C000";
         false -> "606000"
       end,
-      io:format("  ~p:\t~s~n", [Number, color:true(Color, String)])
+      io:format("   ~s~n", [color:true(Color, String)])
     end, lists:zip(Seq, LinesToShow)),
   io:format("~n").
 
@@ -110,13 +112,13 @@ run(Expression) ->
   end.
 
 backtrace(Backtrace) ->
-  io:format("~n  Backtrace:~n~n"),
+  io:format("~n"),
   lists:foreach(fun({Deep, {M,F,A}}) ->
       Space = lists:flatten(lists:duplicate(Deep, " ")),
       io:format("    ~s~s:~s ~p~n", [
         Space,
-        color:true("CC2345", atom_to_list(M)),
-        color:true("CC0000", atom_to_list(F)),
+        color:true("229070", atom_to_list(M)),
+        color:true("22A0A0", atom_to_list(F)),
         A
       ])
     end, lists:reverse(Backtrace)),
