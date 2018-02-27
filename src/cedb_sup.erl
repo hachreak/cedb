@@ -28,7 +28,13 @@ start_link() ->
 
 %% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([]) ->
-    {ok, { {one_for_all, 0, 1}, []} }.
+  Children = [
+    {cedb_srv,
+     {cedb_srv, start_link, []},
+     permanent, 1000, worker, [cedb_srv]
+    }
+  ],
+  {ok, { {one_for_one, 0, 1}, Children} }.
 
 %%====================================================================
 %% Internal functions
