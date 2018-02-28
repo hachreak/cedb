@@ -7,7 +7,7 @@
 
 -export([
   debug/2,
-  break/3
+  break/2
 ]).
 
 %%====================================================================
@@ -15,14 +15,34 @@
 %%====================================================================
 
 debug(Pid, Srv) ->
+  % change group leader to be able to read from user input
+  set_shell_group_leader(),
+  % attach to the process to debug
   {ok, Meta} = int:attached(Pid),
+  % configure meta and pid
   gen_server:cast(Srv, {set, meta, Meta}),
   gen_server:cast(Srv, {set, pid, Pid}),
+  % show messages from int server
   messages(Srv),
+  % start evaluating user input
   eval(go, Srv).
 
-break(Module, Line, Pid) ->
-  gen_server:call(Pid, {break, Module, Line, {cedb, debug, [Pid]}}).
+break(Module, Line) ->
+  Pid = cedb_srv,
+  gen_server:call(
+    Pid, {break, Module, Line, {cedb, debug, [Pid]}}).
+
+%% Private functions
+
+set_shell_group_leader() ->
+  case shell:whereis_evaluator() of
+    Pid when is_pid(Pid) ->
+      ShellInfo = erlang:process_info(Pid),
+      GroupLeader = proplists:get_value(group_leader, ShellInfo),
+      group_leader(GroupLeader, self());
+    Rest ->
+      error_logger:info_msg("no pid shell available: ~p~n", [Rest])
+  end.
 
 eval(continue, Srv) ->
   gen_server:call(Srv, continue);
@@ -53,8 +73,6 @@ messages(Srv) ->
       gen_server:call(Srv, continue);
     {_, {break_at, Module, Line, _}} ->
       {Filename, Content} = gen_server:call(Srv, {get, module, Module}),
-      % io:format("~s~n", [Content]);
-      % lists:foreach(fun(L) -> io:format("~p~n", [L]) end, Content);
       show_line(Filename, Content, Line);
     Msg ->
       io:format("=> ~p~n~n", [Msg])
