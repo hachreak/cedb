@@ -6,7 +6,10 @@
 -module(cedb).
 
 -export([
+  all_breaks/0,
+  all_breaks/1,
   debug/2,
+  delete_break/2,
   break/2
 ]).
 
@@ -31,6 +34,15 @@ break(Module, Line) ->
   Pid = cedb_srv,
   gen_server:call(
     Pid, {break, Module, Line, {cedb, debug, [Pid]}}).
+
+all_breaks(Module) ->
+  int:all_breaks(Module).
+
+all_breaks() ->
+  int:all_breaks().
+
+delete_break(Module, Line) ->
+  int:delete_break(Module, Line).
 
 %% Private functions
 
