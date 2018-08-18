@@ -34,7 +34,7 @@ handle_cast(Msg, Ctx) ->
   {noreply, Ctx2}.
 
 handle_info(Msg, Ctx) ->
-  error_logger:info_msg("Msg not catched: ~p~n", [Msg]),
+  error_logger:info_msg("Unknown message: ~p~n", [Msg]),
   {noreply, Ctx}.
 
 %% Backend
@@ -55,11 +55,26 @@ sync_cmd({break, Module, Line, MFA}, Ctx) ->
   int:break(Module, Line),
   int:auto_attach([break], MFA),
   {ok, Ctx};
+sync_cmd({break, {Module, Name, Arity}, MFA}, Ctx) ->
+  int:i(Module),
+  int:break_in(Module, Name, Arity),
+  int:auto_attach([break], MFA),
+  {ok, Ctx};
 sync_cmd(continue, #{pid := Pid}=Ctx) ->
   int:continue(Pid),
   {ok, Ctx};
+sync_cmd(finish, #{meta := Meta}=Ctx) ->
+  int:meta(Meta, finish),
+  {ok, Ctx};
 sync_cmd(backtrace, #{meta := Meta}=Ctx) ->
   Ret = int:meta(Meta, backtrace, 100),
+  {Ret, Ctx};
+sync_cmd({binding, Var}, #{meta := Meta}=Ctx) ->
+  Bindings = int:meta(Meta, bindings, nostack),
+  Ret = case lists:keyfind(Var, 1, Bindings) of
+    false        -> undefined;
+    {Var, Value} -> Value
+  end,
   {Ret, Ctx};
 sync_cmd(bindings, #{meta := Meta}=Ctx) ->
   Ret = int:meta(Meta, bindings, nostack),

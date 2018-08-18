@@ -10,7 +10,9 @@
   all_breaks/1,
   debug/2,
   delete_break/2,
-  break/2
+  delete_break/3,
+  break/2,
+  break/3
 ]).
 
 %%====================================================================
@@ -34,6 +36,10 @@ break(Module, Line) ->
   Pid = cedb_srv,
   gen_server:call(
     Pid, {break, Module, Line, {cedb, debug, [Pid]}}).
+break(Module, Function, Arity) ->
+  Pid = cedb_srv,
+  gen_server:call(
+    Pid, {break, {Module, Function, Arity}, {cedb, debug, [Pid]}}).
 
 all_breaks(Module) ->
   int:all_breaks(Module).
@@ -43,6 +49,8 @@ all_breaks() ->
 
 delete_break(Module, Line) ->
   int:delete_break(Module, Line).
+delete_break(Module, Function, Arity) ->
+  int:delete_break_in(Module, Function, Arity).
 
 %% Private functions
 
@@ -58,15 +66,66 @@ set_shell_group_leader() ->
 
 eval(continue, Srv) ->
   gen_server:call(Srv, continue);
-eval(Cmd, Srv) ->
-  case lists:member(Cmd, [finish, next, step, skip, stop,
-                          messages, timeout, bindings, continue, backtrace]) of
-    true ->
-      print(Cmd, gen_server:call(Srv, Cmd)),
-      messages(Srv);
-    false ->
+eval(finish, _Srv) ->
+  ok;
+eval(go, Srv) ->
+  repl(Srv);
+eval(Cmd, Srv) when is_atom(Cmd) ->
+  CmdStr = atom_to_binary(Cmd, utf8),
+  Cmds = [
+           <<"backtrace">>,
+           <<"bindings">>,
+           <<"continue">>,
+           <<"finish">>,
+           <<"messages">>,
+           <<"next">>,
+           <<"skip">>,
+           <<"step">>,
+           <<"stop">>,
+           <<"timeout">>
+          ],
+
+  % Get possible commands from abbreviation
+  CmdOpts = lists:filter(
+              fun(Elem) ->
+                case string:prefix(Elem, CmdStr) of
+                  nomatch -> false;
+                  _       -> true
+                end
+              end,
+              Cmds
+            ),
+
+  % Handle command
+  Ret = case length(CmdOpts) of
+    1 ->
+      CmdAtom = erlang:binary_to_atom(lists:nth(1, CmdOpts), utf8),
+      case CmdAtom of
+        finish -> finish;
+        _      ->
+        print(CmdAtom, gen_server:call(Srv, CmdAtom)),
+        messages(Srv)
+      end;
+    0 ->
+      io:format("Unknown command ~s~n", [Cmd]),
+      ok;
+    _ ->
+      io:format("Bad prefix abbreviation, try one of: ~s~n", [lists:join(", ", CmdOpts)]),
       ok
   end,
+
+  % exit when finished
+  case Ret of
+    finish -> ok;
+    ok     ->
+      repl(Srv)
+  end;
+
+eval({binding, Var}, Srv) ->
+  print(binding, gen_server:call(Srv, {binding, Var})),
+  repl(Srv);
+eval(Cmd, Srv) ->
+  io:format("Unknown command ~p~n", [Cmd]),
   repl(Srv).
 
 repl(Srv) ->
@@ -76,8 +135,8 @@ print(bindings, Bindings) ->
   io:format("Bindings ~p~n", [Bindings]);
 print(backtrace, Backtrace) ->
   backtrace(Backtrace);
-print(Cmd, ToPrint) ->
-  io:format("To print: ~p ~p~n", [Cmd, ToPrint]).
+print(_Cmd, ToPrint) ->
+  io:format("~p~n", [ToPrint]).
 
 messages(Srv) ->
   Result = receive
@@ -138,7 +197,9 @@ run(Expression) ->
   catch
     error:{badmatch, {error, {_, erl_parse, Err}}} ->
       io:format("[~s] ~p~n", [color:red("error"), Err]),
-      "\n"
+      "\n";
+    error:{unbound_var, Var} ->
+      {binding, Var}
   end.
 
 backtrace(Backtrace) ->
