@@ -41,7 +41,7 @@ File /projects/cedb/examples/test/_build/default/lib/test/src/test.erl
    21:       io:format("I'm in function 2, the value is ~p~n", [C]),
 
 cedb> next.
-ok 
+ok
 => {<0.258.0>,running}
 
 File /projects/cedb/examples/test/_build/default/lib/test/src/test.erl
@@ -61,7 +61,7 @@ File /projects/cedb/examples/test/_build/default/lib/test/src/test.erl
 cedb> A.
 "Hello"
 cedb> n.
-ok 
+ok
 => {<0.258.0>,running}
 cedb>
 ```
@@ -85,4 +85,13 @@ stop         | Stop debugging.
 timeout      | Timeout.
 Var          | Variable names are evaluated in the current context.
 
-Abbreviations of the above commands are also accepted, like `n` for `next`, `ba` for `backtrace` etc.
+Abbreviations of the above commands are also accepted, like `n` for `next`,
+`ba` for `backtrace` etc.
+
+Breakpoints
+-----------
+
+Command                         | Description
+--------------------------------|-------------------------------------------
+cedb:break(test, 16).           | Add a breakpoint to line 16.
+cedb:break(test, function2, 1). | Add a breakpoint to function `function2`.
